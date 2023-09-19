@@ -1,0 +1,37 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "localprojections"
+version = "0.0.6"
+description = "This module implements the local projections models for single entity time series, and panel / longitudinal data settings, due to Jorda (2005)."
+readme = "README.md"
+authors = [{ name = "Jing Lian Suah", email = "suahjinglian@bnm.gov.my" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["Econometrics", "Local Projections", "Panel Data", "Time Series"]
+dependencies = [
+    "pandas >= 1.4.3",
+	"numpy >= 1.23.0",
+	"linearmodels >= 4.27",
+	"plotly >= 5.9.0",
+	"statsmodels >= 0.13.2",
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = []
+
+[project.urls]
+PyPI = "https://pypi.org/project/localprojections/"
+GitHub = "https://github.com/suahjl/localprojections/"
+
+[project.scripts]
+localprojections = "localprojections.__main__:main"

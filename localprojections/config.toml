@@ -1,0 +1,4 @@
+# config.toml
+
+[feed]
+url = "https://github.com/suahjl/localprojections/"
