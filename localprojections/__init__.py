@@ -13,6 +13,8 @@ __version__ = "0.0.2"
 from .lp import (
     PanelLP,
     PanelLPX,
+    ThresholdPanelLPX,
     TimeSeriesLP,
     IRFPlot,
+    ThresholdIRFPlot
 )

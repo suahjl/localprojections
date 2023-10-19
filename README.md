@@ -154,6 +154,50 @@ irfplot = lp.IRFPlot(irf=irf, # take output from the estimated model
                      )
 ```
 
+## Panel Local Projections Model with Exogenous Variables (Panel LPX)
+### Documentation
+```python
+localprojections.ThresholdPanelLPX(data, Y, X, threshold_var, response, horizon, lags, varcov, ci_width)
+```
+#### Parameters
+data :  
+	Pandas MultiIndex dataframe with entity as the outer index, and time as the inner index.
+
+Y :  
+	List of column names in ```data``` to be used in the model estimation as endogenous variables
+
+X :  
+	List of column names in ```data``` to be used in the model estimation as exogenous variablesiables
+
+threshold_var :  
+	String indicating column in ```data``` to be used as the threshold variable; must take values 0 or 1 for technically correct implementation
+
+response :  
+	List of column names in ```Y``` to be used as response variables when estimating the impulse response functions (IRFs)
+
+horizon :  
+	Integer indicating the estimation horizon of the IRFs
+
+lags :  
+	Integer indicating the number of lags to be included in the model estimation
+
+varcov :  
+	Variance-covariance estimator to be used in estimating standard errors; refer to the [linearmodels package](https://bashtage.github.io/linearmodels/panel/panel/linearmodels.panel.model.PanelOLS.fit.html#linearmodels.panel.model.PanelOLS.fit).
+
+ci_width :  
+	Float higher than 0 and less than 1, i.e., (0, 1), indicating the width of the confidence intervals of the IRFs; ```ci_width=0.95``` indicates a 95% confidence interval
+
+#### Output
+This function returns *two* pandas dataframes of 6 columns each, with the first output corresponding to when ```threshold_var``` takes value 1, and the second when ```threshold_var`` takes value 0: 
+1. ```Shock``` indicates the shock variable
+2. ```Response``` indicates the response variable
+3. ```Horizon``` indicates the response horizon of the IRF
+4. ```Mean``` indicates the point estimate of the IRF
+5. ```LB``` indicates the lower bound of the confidence interval of the IRF
+6. ```LB``` indicates the upper bound of the confidence interval of the IRF
+
+For instance, the estimates of the 6-period ahead IRF of y from a shock in x, can be found in the row with ```Shock=x```, ```Response=y```, and ```Horizon=6```
+
 ## Single Entity Time Series Local Projections Model
 ### Documentation
 ```python
