@@ -248,7 +248,7 @@ def ThresholdPanelLPX(data, Y, X, threshold_var, response, horizon, lags, varcov
             X_On = [i + ':' + 'threshold_on' for i in X]
             X_Off = [i + ':' + 'threshold_off' for i in X]
             # Estimate the model
-            eqn = r+'forward' + '~' + '+'.join(list_RHS_forReg_On) + '+' '+'.join(list_RHS_forReg_Off) + '+' + '+'.join(X_On)+ '+' + '+'.join(X_Off) + '+EntityEffects'
+            eqn = r+'forward' + '~' + '+'.join(list_RHS_forReg_On) + '+' + '+'.join(list_RHS_forReg_Off) + '+' + '+'.join(X_On) + '+' + '+'.join(X_Off) + '+EntityEffects'
             eqn_ownshock = r+'forward' + '~' + '+'.join([r + ":threshold_on"] + list_RHS_forReg_On) + '+' + '+'.join([r + ":threshold_off"] + list_RHS_forReg_Off) + '+' + '+'.join(X_On)+ '+' + '+'.join(X_Off) + '+EntityEffects' # own-shock model includes contemp first diff dependent
             mod = PanelOLS.from_formula(eqn, data=d)
             mod_ownshock = PanelOLS.from_formula(eqn_ownshock, data=d) # own-shock model
@@ -263,7 +263,7 @@ def ThresholdPanelLPX(data, Y, X, threshold_var, response, horizon, lags, varcov
                 irf = pd.DataFrame([[1] * len(col_output)], columns=col_output) # double list = single row
                 irf['Response'] = r
                 irf['Horizon'] = h
-                if r in z: # shock = response (diff from other functions)
+                if r in znice: # shock = response (diff from other functions)
                     irf['Shock'] = r
                     irf['Mean'] = beta_ownshock[z]
                     irf['LB'] = beta_ownshock[z] - z_val * se_ownshock[z]
@@ -279,7 +279,7 @@ def ThresholdPanelLPX(data, Y, X, threshold_var, response, horizon, lags, varcov
                 irf = pd.DataFrame([[1] * len(col_output)], columns=col_output) # double list = single row
                 irf['Response'] = r
                 irf['Horizon'] = h
-                if r in z: # shock = response (diff from other functions)
+                if r in znice: # shock = response (diff from other functions)
                     irf['Shock'] = r
                     irf['Mean'] = beta_ownshock[z]
                     irf['LB'] = beta_ownshock[z] - z_val * se_ownshock[z]
@@ -525,31 +525,6 @@ def ThresholdIRFPlot(irf_threshold_on,
             fig.add_trace(go.Scatter(x=d['Horizon'],
                                         y=d['Mean'],
                                         mode='lines',
-                                        line=dict(color='black', width=2, dash='solid')),
-                            row=count_row, col=count_col
-                            )
-            # lb
-            fig.add_trace(go.Scatter(x=d['Horizon'],
-                                        y=d['LB'],
-                                        mode='lines',
-                                        line=dict(color='black', width=1, dash='dash')),
-                            row=count_row, col=count_col
-                            )
-            # ub
-            fig.add_trace(go.Scatter(x=d['Horizon'],
-                                        y=d['UB'],
-                                        mode='lines',
-                                        line=dict(color='black', width=1, dash='dash')),
-                            row=count_row, col=count_col
-                            )
-            
-            # B. H = 0
-            d = irf_threshold_off.loc[(irf_threshold_off['Response'] == r) & (irf_threshold_off['Shock'] == s)]
-            # zero
-            # mean
-            fig.add_trace(go.Scatter(x=d['Horizon'],
-                                        y=d['Mean'],
-                                        mode='lines',
                                         line=dict(color='crimson', width=2, dash='solid')),
                             row=count_row, col=count_col
                             )
@@ -565,6 +540,31 @@ def ThresholdIRFPlot(irf_threshold_on,
                                         y=d['UB'],
                                         mode='lines',
                                         line=dict(color='crimson', width=1, dash='dash')),
+                            row=count_row, col=count_col
+                            )
+            
+            # B. H = 0
+            d = irf_threshold_off.loc[(irf_threshold_off['Response'] == r) & (irf_threshold_off['Shock'] == s)]
+            # zero
+            # mean
+            fig.add_trace(go.Scatter(x=d['Horizon'],
+                                        y=d['Mean'],
+                                        mode='lines',
+                                        line=dict(color='black', width=2, dash='solid')),
+                            row=count_row, col=count_col
+                            )
+            # lb
+            fig.add_trace(go.Scatter(x=d['Horizon'],
+                                        y=d['LB'],
+                                        mode='lines',
+                                        line=dict(color='black', width=1, dash='dash')),
+                            row=count_row, col=count_col
+                            )
+            # ub
+            fig.add_trace(go.Scatter(x=d['Horizon'],
+                                        y=d['UB'],
+                                        mode='lines',
+                                        line=dict(color='black', width=1, dash='dash')),
                             row=count_row, col=count_col
                             )
             count_col += 1 # move to next
