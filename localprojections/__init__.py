@@ -14,6 +14,7 @@ from .lp import (
     PanelLP,
     PanelLPX,
     ThresholdPanelLPX,
+    ThresholdTimeSeriesLPX,
     TimeSeriesLP,
     TimeSeriesLPX,
     IRFPlot,
