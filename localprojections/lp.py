@@ -908,6 +908,323 @@ def TimeSeriesLPX(data, Y, X, response, horizon, lags, newey_lags=4, ci_width=0.
     return irf_full
 
 
+### PanelQuantileLPX
+## Input attributes
+# Implements panel quantile regression using statsmodels and entity dummies (rather than "de-mean" fixed effects)
+# data = pandas dataframe (each row = 1 period)
+# Y = list of variables, cholesky ordered (last = contemporaneous shock from all previous variables)
+# X = list of exogenous variables, to be entered contemporaneously into the model; must not overlap with elements of Y
+# response = list of variables contained in Y to be shocked
+# horizon = integer indicating estimation horizon for the IRFs (e.g., input 8 for 8 quarters ahead)
+# lags = integer indicating number of lags to be used in the estimation models (e.g., 4 for 4 lags)
+# varcov = type of standard errors
+# kernel = type of kernel used to estimate the cov matrix 
+# bandwidth = bandwidth for kernel density estimation
+# ci_width = float within (0, 1) indicating the width of the confidence band (e.g., 0.95 for 95% CI)
+# quantile = which quantile to estimate
+def PanelQuantileLPX(
+        data, 
+        Y, 
+        X,
+        Entity,
+        response, 
+        horizon, 
+        lags, 
+        varcov="robust", 
+        kernel="epa", 
+        bandwidth="hsheather", 
+        ci_width=0.95, 
+        quantile=0.5
+        ):
+    ## Illegal inputs
+    if (ci_width >= 1) | (ci_width <= 0):
+        raise NotImplementedError("CI Width must be within (0, 1), non-inclusive!")
+    if horizon < 1:
+        raise NotImplementedError("Estimation horizon for IRFs must be at least 1")
+    if lags < 1:
+        raise NotImplementedError("Number of lags in the model must be at least 1")
+    if any(col in X for col in Y):
+        raise NotImplementedError(
+            "Exogenous and endogenous blocks overlap! Please ensure they are mutually exclusive"
+        )
+    ## Preliminaries
+    # deep copy
+    df = data.copy()
+    # fixed effects dummies
+    cols_entity_dummies = []
+    for entity in list(df[Entity].unique()):
+        df.loc[df[Entity] == entity, entity] = 1
+        df.loc[df[entity].isna(), entity] = 0
+        cols_entity_dummies += [entity]
+    # reference for LP regressions
+    col_entity = Entity
+    # Column names of the output dataframe
+    col_output = [
+        "Shock",
+        "Response",
+        "Horizon",
+        "Point",
+        "LB",
+        "UB",
+    ]  
+    # Empty output dataframe to be filled over every iteration
+    irf_full = pd.DataFrame(
+        columns=col_output
+    ) 
+    # Determines what multiplier to use when calculating UB & LB from SE
+    z_val = NormalDist().inv_cdf(
+        (1 + ci_width) / 2
+    )  
+
+    for r in response:
+        ## Check ordering of response variable in the full list of Y
+        r_loc = Y.index(r)
+        ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
+        for h in range(horizon + 1):
+            d = df.copy()
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(
+                -h
+            )  # forward; equivalent to F`h'. in Stata
+            ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
+            list_RHS_forReg = []
+            list_RHS_forIRF = []
+            for y in Y:
+                d[y] = d[y] - d.groupby(col_entity)[y].shift(1)  # first difference
+                if Y.index(y) == r_loc:  # include lagged response variables on the RHS
+                    for l in range(1, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(
+                            l
+                        )  # for lagged dependent variable, we will use _l1 to generate the IRF
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                    list_RHS_forIRF = list_RHS_forIRF + [
+                        y
+                    ]  # to figure out if the own-shock model should be used
+                if Y.index(y) < r_loc:  # y affects r contemporaneously
+                    list_RHS_forReg = list_RHS_forReg + [y]
+                    list_RHS_forIRF = list_RHS_forIRF + [y]
+                    for l in range(1, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(
+                            l
+                        )  # keep original name for convenience (d[y] = _l0 will be used for IRF)
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                elif Y.index(y) > r_loc:  # y affects r with a lag
+                    list_RHS_forReg = list_RHS_forReg + [y]
+                    list_RHS_forIRF = list_RHS_forIRF + [y]
+                    for l in range(2, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(l)
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                    d[y] = d[y].shift(
+                        1
+                    )  # replace original with first lag (d[y] = _l1 will be used for IRF)
+            d = d.dropna(
+                axis=0
+            )  # clear all rows with NAs from the lag / forward transformations
+            eqn = (
+                r
+                + "forward"
+                + "~"
+                + "+".join(list_RHS_forReg)
+                + "+"
+                + "+".join(X)
+                + "+"
+                + "+".join(cols_entity_dummies)
+            )
+            eqn_ownshock = (
+                r
+                + "forward"
+                + "~"
+                + "+".join([r] + list_RHS_forReg)
+                + "+"
+                + "+".join(X)
+                + "+"
+                + "+".join(cols_entity_dummies)
+            )  # own-shock model includes contemp first diff dependent
+            mod = smf.quantreg(formula=eqn, data=d)
+            mod_ownshock = smf.quantreg(formula=eqn_ownshock, data=d)  # own-shock model
+            est = mod.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)
+            est_ownshock = mod_ownshock.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)  # own-shock model
+            beta = est.params
+            beta_ownshock = est_ownshock.params  # own-shock model
+            se = est.bse
+            se_ownshock = est_ownshock.bse  # own-shock model
+            for z in list_RHS_forIRF:
+                irf = pd.DataFrame(
+                    [[1] * len(col_output)], columns=col_output
+                )  # double list = single row
+                irf["Response"] = r
+                irf["Horizon"] = h
+                if z == r:  # shock = response
+                    irf["Shock"] = r
+                    irf["Point"] = beta_ownshock[z]
+                    irf["LB"] = beta_ownshock[z] - z_val * se_ownshock[z]
+                    irf["UB"] = beta_ownshock[z] + z_val * se_ownshock[z]
+                else:  # shock =/= response
+                    irf["Shock"] = z
+                    irf["Point"] = beta[z]
+                    irf["LB"] = beta[z] - z_val * se[z]
+                    irf["UB"] = beta[z] + z_val * se[z]
+                irf_full = pd.concat([irf_full, irf], axis=0)  # top to bottom concat
+    ## Sort by response, shock, horizon
+    irf_full = irf_full.sort_values(
+        by=["Response", "Shock", "Horizon"], axis=0, ascending=[True, True, True]
+    )
+    return irf_full
+
+
+
+### PanelQuantileLP
+## Input attributes
+# Implements panel quantile regression using statsmodels and entity dummies (rather than "de-mean" fixed effects) without exogenous block
+# data = pandas dataframe (each row = 1 period)
+# Y = list of variables, cholesky ordered (last = contemporaneous shock from all previous variables)
+# response = list of variables contained in Y to be shocked
+# horizon = integer indicating estimation horizon for the IRFs (e.g., input 8 for 8 quarters ahead)
+# lags = integer indicating number of lags to be used in the estimation models (e.g., 4 for 4 lags)
+# varcov = type of standard errors
+# kernel = type of kernel used to estimate the cov matrix 
+# bandwidth = bandwidth for kernel density estimation
+# ci_width = float within (0, 1) indicating the width of the confidence band (e.g., 0.95 for 95% CI)
+# quantile = which quantile to estimate
+def PanelQuantileLP(
+        data, 
+        Y,
+        Entity,
+        response, 
+        horizon, 
+        lags, 
+        varcov="robust", 
+        kernel="epa", 
+        bandwidth="hsheather", 
+        ci_width=0.95, 
+        quantile=0.5
+        ):
+    ## Illegal inputs
+    if (ci_width >= 1) | (ci_width <= 0):
+        raise NotImplementedError("CI Width must be within (0, 1), non-inclusive!")
+    if horizon < 1:
+        raise NotImplementedError("Estimation horizon for IRFs must be at least 1")
+    if lags < 1:
+        raise NotImplementedError("Number of lags in the model must be at least 1")
+    ## Preliminaries
+    # deep copy
+    df = data.copy()
+    # fixed effects dummies
+    cols_entity_dummies = []
+    for entity in list(df[Entity].unique()):
+        df.loc[df[Entity] == entity, entity] = 1
+        df.loc[df[entity].isna(), entity] = 0
+        cols_entity_dummies += [entity]
+    # reference for LP regressions
+    col_entity = Entity
+    # Column names of the output dataframe
+    col_output = [
+        "Shock",
+        "Response",
+        "Horizon",
+        "Point",
+        "LB",
+        "UB",
+    ]  
+    # Empty output dataframe to be filled over every iteration
+    irf_full = pd.DataFrame(
+        columns=col_output
+    ) 
+    # Determines what multiplier to use when calculating UB & LB from SE
+    z_val = NormalDist().inv_cdf(
+        (1 + ci_width) / 2
+    )  
+
+    for r in response:
+        ## Check ordering of response variable in the full list of Y
+        r_loc = Y.index(r)
+        ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
+        for h in range(horizon + 1):
+            d = df.copy()
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(
+                -h
+            )  # forward; equivalent to F`h'. in Stata
+            ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
+            list_RHS_forReg = []
+            list_RHS_forIRF = []
+            for y in Y:
+                d[y] = d[y] - d.groupby(col_entity)[y].shift(1)  # first difference
+                if Y.index(y) == r_loc:  # include lagged response variables on the RHS
+                    for l in range(1, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(
+                            l
+                        )  # for lagged dependent variable, we will use _l1 to generate the IRF
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                    list_RHS_forIRF = list_RHS_forIRF + [
+                        y
+                    ]  # to figure out if the own-shock model should be used
+                if Y.index(y) < r_loc:  # y affects r contemporaneously
+                    list_RHS_forReg = list_RHS_forReg + [y]
+                    list_RHS_forIRF = list_RHS_forIRF + [y]
+                    for l in range(1, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(
+                            l
+                        )  # keep original name for convenience (d[y] = _l0 will be used for IRF)
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                elif Y.index(y) > r_loc:  # y affects r with a lag
+                    list_RHS_forReg = list_RHS_forReg + [y]
+                    list_RHS_forIRF = list_RHS_forIRF + [y]
+                    for l in range(2, lags + 1):
+                        d[y + str(l) + "lag"] = d.groupby(col_entity)[y].shift(l)
+                        list_RHS_forReg = list_RHS_forReg + [y + str(l) + "lag"]
+                    d[y] = d[y].shift(
+                        1
+                    )  # replace original with first lag (d[y] = _l1 will be used for IRF)
+            d = d.dropna(
+                axis=0
+            )  # clear all rows with NAs from the lag / forward transformations
+            eqn = (
+                r
+                + "forward"
+                + "~"
+                + "+".join(list_RHS_forReg)
+                + "+"
+                + "+".join(cols_entity_dummies)
+            )
+            eqn_ownshock = (
+                r
+                + "forward"
+                + "~"
+                + "+".join([r] + list_RHS_forReg)
+                + "+"
+                + "+".join(cols_entity_dummies)
+            )  # own-shock model includes contemp first diff dependent
+            mod = smf.quantreg(formula=eqn, data=d)
+            mod_ownshock = smf.quantreg(formula=eqn_ownshock, data=d)  # own-shock model
+            est = mod.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)
+            est_ownshock = mod_ownshock.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)  # own-shock model
+            beta = est.params
+            beta_ownshock = est_ownshock.params  # own-shock model
+            se = est.bse
+            se_ownshock = est_ownshock.bse  # own-shock model
+            for z in list_RHS_forIRF:
+                irf = pd.DataFrame(
+                    [[1] * len(col_output)], columns=col_output
+                )  # double list = single row
+                irf["Response"] = r
+                irf["Horizon"] = h
+                if z == r:  # shock = response
+                    irf["Shock"] = r
+                    irf["Point"] = beta_ownshock[z]
+                    irf["LB"] = beta_ownshock[z] - z_val * se_ownshock[z]
+                    irf["UB"] = beta_ownshock[z] + z_val * se_ownshock[z]
+                else:  # shock =/= response
+                    irf["Shock"] = z
+                    irf["Point"] = beta[z]
+                    irf["LB"] = beta[z] - z_val * se[z]
+                    irf["UB"] = beta[z] + z_val * se[z]
+                irf_full = pd.concat([irf_full, irf], axis=0)  # top to bottom concat
+    ## Sort by response, shock, horizon
+    irf_full = irf_full.sort_values(
+        by=["Response", "Shock", "Horizon"], axis=0, ascending=[True, True, True]
+    )
+    return irf_full
+
+
 ### IRFPlot
 ## Input attributes
 # irf = output from PanelLP

@@ -7,7 +7,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 # Version of the localprojections package
-__version__ = "0.0.2"
+__version__ = "0.1.4"
  
 # Load scripts / classes / functions so that they can be called directly
 from .lp import (
@@ -17,6 +17,8 @@ from .lp import (
     ThresholdTimeSeriesLPX,
     TimeSeriesLP,
     TimeSeriesLPX,
+    PanelQuantileLPX,
+    PanelQuantileLP,
     IRFPlot,
     ThresholdIRFPlot
 )

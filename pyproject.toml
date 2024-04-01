@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localprojections"
-version = "0.1.2"
+version = "0.1.4"
 description = "This module implements the local projections models for single entity time series and panel / longitudinal data, as well as threshold versions."
 readme = "README.md"
 authors = [{ name = "Jing Lian Suah", email = "suahjinglian@bnm.gov.my" }]
