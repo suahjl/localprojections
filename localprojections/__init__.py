@@ -19,6 +19,7 @@ from .lp import (
     TimeSeriesLPX,
     PanelQuantileLPX,
     PanelQuantileLP,
+    ThresholdPanelQuantileLPX,
     IRFPlot,
     ThresholdIRFPlot
 )
