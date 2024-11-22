@@ -1,5 +1,6 @@
 # To implement the local projections methodology described in Jorda (2005), including the panel data version
-# Written by Jing Lian Suah, Senior Economist at the Data, Analytics, and Research Unit, Central Bank of Malaysia
+# Written by Jing Lian Suah, manager at the Hong Kong Institute for Monetary and Financial Research(HKIMR)
+# (Previously at the Central Bank of Malaysia, National Institutes of Health Malaysia and Ministry of Health Malaysia)
 
 import pandas as pd
 import numpy as np
@@ -52,8 +53,10 @@ def PanelLP(data, Y, response, horizon, lags, varcov="kernel", ci_width=0.95):
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d.groupby(col_entity)[r].shift(
-                -h
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(-h) - d.groupby(
+                col_entity
+            )[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -174,8 +177,10 @@ def PanelLPX(data, Y, X, response, horizon, lags, varcov="kernel", ci_width=0.95
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d.groupby(col_entity)[r].shift(
-                -h
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(-h) - d.groupby(
+                col_entity
+            )[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -324,8 +329,10 @@ def ThresholdPanelLPX(
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d.groupby(col_entity)[r].shift(
-                -h
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(-h) - d.groupby(
+                col_entity
+            )[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -531,8 +538,8 @@ def ThresholdTimeSeriesLPX(
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d[r].shift(
-                -h
+            d[r + "forward"] = d[r].shift(-h) - d[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -619,9 +626,7 @@ def ThresholdTimeSeriesLPX(
                 + "+threshold_on +threshold_off"
             )  # own-shock model includes contemp first diff dependent
             mod = smf.ols(eqn, data=d)
-            mod_ownshock = smf.ols(
-                eqn_ownshock, data=d
-            )  # own-shock model
+            mod_ownshock = smf.ols(eqn_ownshock, data=d)  # own-shock model
             est = mod.fit(cov_type="HAC", cov_kwds={"maxlags": newey_lags})
             est_ownshock = mod_ownshock.fit(
                 cov_type="HAC", cov_kwds={"maxlags": newey_lags}
@@ -679,6 +684,7 @@ def ThresholdTimeSeriesLPX(
     )
     return irf_on_full, irf_off_full
 
+
 ### TimeSeriesLP
 ## Input attributes
 # This is almost identical procedurally with the Panel version
@@ -718,7 +724,9 @@ def TimeSeriesLP(data, Y, response, horizon, lags, newey_lags=4, ci_width=0.95):
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d[r].shift(-h)  # forward; equivalent to F`h'. in Stata
+            d[r + "forward"] = d[r].shift(-h) - d[r].shift(
+                1
+            )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
             list_RHS_forIRF = []
@@ -835,7 +843,9 @@ def TimeSeriesLPX(data, Y, X, response, horizon, lags, newey_lags=4, ci_width=0.
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = data.copy()
-            d[r + "forward"] = d[r].shift(-h)  # forward; equivalent to F`h'. in Stata
+            d[r + "forward"] = d[r].shift(-h) - d[r].shift(
+                1
+            )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
             list_RHS_forIRF = []
@@ -872,7 +882,12 @@ def TimeSeriesLPX(data, Y, X, response, horizon, lags, newey_lags=4, ci_width=0.
             )  # clear all rows with NAs from the lag / forward transformations
             eqn = r + "forward" + "~" + "+".join(list_RHS_forReg) + "+" + "+".join(X)
             eqn_ownshock = (
-                r + "forward" + "~" + "+".join([r] + list_RHS_forReg) + "+" + "+".join(X)
+                r
+                + "forward"
+                + "~"
+                + "+".join([r] + list_RHS_forReg)
+                + "+"
+                + "+".join(X)
             )  # own-shock model includes contemp first diff dependent
             mod = smf.ols(eqn, data=d)
             mod_ownshock = smf.ols(eqn_ownshock, data=d)  # own-shock model
@@ -918,24 +933,24 @@ def TimeSeriesLPX(data, Y, X, response, horizon, lags, newey_lags=4, ci_width=0.
 # horizon = integer indicating estimation horizon for the IRFs (e.g., input 8 for 8 quarters ahead)
 # lags = integer indicating number of lags to be used in the estimation models (e.g., 4 for 4 lags)
 # varcov = type of standard errors
-# kernel = type of kernel used to estimate the cov matrix 
+# kernel = type of kernel used to estimate the cov matrix
 # bandwidth = bandwidth for kernel density estimation
 # ci_width = float within (0, 1) indicating the width of the confidence band (e.g., 0.95 for 95% CI)
 # quantile = which quantile to estimate
 def PanelQuantileLPX(
-        data, 
-        Y, 
-        X,
-        Entity,
-        response, 
-        horizon, 
-        lags, 
-        varcov="robust", 
-        kernel="epa", 
-        bandwidth="hsheather", 
-        ci_width=0.95, 
-        quantile=0.5
-        ):
+    data,
+    Y,
+    X,
+    Entity,
+    response,
+    horizon,
+    lags,
+    varcov="robust",
+    kernel="epa",
+    bandwidth="hsheather",
+    ci_width=0.95,
+    quantile=0.5,
+):
     ## Illegal inputs
     if (ci_width >= 1) | (ci_width <= 0):
         raise NotImplementedError("CI Width must be within (0, 1), non-inclusive!")
@@ -966,15 +981,11 @@ def PanelQuantileLPX(
         "Mean",
         "LB",
         "UB",
-    ]  
+    ]
     # Empty output dataframe to be filled over every iteration
-    irf_full = pd.DataFrame(
-        columns=col_output
-    ) 
+    irf_full = pd.DataFrame(columns=col_output)
     # Determines what multiplier to use when calculating UB & LB from SE
-    z_val = NormalDist().inv_cdf(
-        (1 + ci_width) / 2
-    )  
+    z_val = NormalDist().inv_cdf((1 + ci_width) / 2)
 
     for r in response:
         ## Check ordering of response variable in the full list of Y
@@ -1042,7 +1053,9 @@ def PanelQuantileLPX(
             mod = smf.quantreg(formula=eqn, data=d)
             mod_ownshock = smf.quantreg(formula=eqn_ownshock, data=d)  # own-shock model
             est = mod.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)
-            est_ownshock = mod_ownshock.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)  # own-shock model
+            est_ownshock = mod_ownshock.fit(
+                q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth
+            )  # own-shock model
             beta = est.params
             beta_ownshock = est_ownshock.params  # own-shock model
             se = est.bse
@@ -1070,6 +1083,7 @@ def PanelQuantileLPX(
     )
     return irf_full
 
+
 ### ThresholdPanelQuantileLPX
 ## Input attributes
 # This is almost identical procedurally with the Panel version
@@ -1083,19 +1097,19 @@ def PanelQuantileLPX(
 # newey_lags = max lags for Newey-West HAC SEs
 # ci_width = float within (0, 1) indicating the width of the confidence band (e.g., 0.95 for 95% CI)
 def ThresholdPanelQuantileLPX(
-    data, 
-    Y, 
-    X, 
+    data,
+    Y,
+    X,
     Entity,
-    threshold_var, 
-    response, 
-    horizon, 
-    lags, 
-    varcov="robust", 
-    kernel="epa", 
-    bandwidth="hsheather", 
-    ci_width=0.95, 
-    quantile=0.5
+    threshold_var,
+    response,
+    horizon,
+    lags,
+    varcov="robust",
+    kernel="epa",
+    bandwidth="hsheather",
+    ci_width=0.95,
+    quantile=0.5,
 ):
     ## Illegal inputs
     if (ci_width >= 1) | (ci_width <= 0):
@@ -1136,19 +1150,13 @@ def ThresholdPanelQuantileLPX(
         "Mean",
         "LB",
         "UB",
-    ]  
+    ]
     # Empty output dataframe to be filled over every iteration (for H = 1)
-    irf_on_full = pd.DataFrame(
-        columns=col_output
-    )  
+    irf_on_full = pd.DataFrame(columns=col_output)
     # Empty output dataframe to be filled over every iteration (for H = 0)
-    irf_off_full = pd.DataFrame(
-        columns=col_output
-    )  
+    irf_off_full = pd.DataFrame(columns=col_output)
     # Determines what multiplier to use when calculating UB & LB from SE
-    z_val = NormalDist().inv_cdf(
-        (1 + ci_width) / 2
-    )  
+    z_val = NormalDist().inv_cdf((1 + ci_width) / 2)
 
     for r in response:
         ## Check ordering of response variable in the full list of Y
@@ -1156,8 +1164,10 @@ def ThresholdPanelQuantileLPX(
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = df.copy()
-            d[r + "forward"] = d.groupby(col_entity)[r].shift(
-                -h
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(-h) - d.groupby(
+                col_entity
+            )[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -1250,7 +1260,9 @@ def ThresholdPanelQuantileLPX(
             mod = smf.quantreg(formula=eqn, data=d)
             mod_ownshock = smf.quantreg(formula=eqn_ownshock, data=d)  # own-shock model
             est = mod.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)
-            est_ownshock = mod_ownshock.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)  # own-shock mode
+            est_ownshock = mod_ownshock.fit(
+                q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth
+            )  # own-shock mode
             beta = est.params
             beta_ownshock = est_ownshock.params  # own-shock model
             se = est.bse
@@ -1305,7 +1317,6 @@ def ThresholdPanelQuantileLPX(
     return irf_on_full, irf_off_full
 
 
-
 ### PanelQuantileLP
 ## Input attributes
 # Implements panel quantile regression using statsmodels and entity dummies (rather than "de-mean" fixed effects) without exogenous block
@@ -1315,23 +1326,23 @@ def ThresholdPanelQuantileLPX(
 # horizon = integer indicating estimation horizon for the IRFs (e.g., input 8 for 8 quarters ahead)
 # lags = integer indicating number of lags to be used in the estimation models (e.g., 4 for 4 lags)
 # varcov = type of standard errors
-# kernel = type of kernel used to estimate the cov matrix 
+# kernel = type of kernel used to estimate the cov matrix
 # bandwidth = bandwidth for kernel density estimation
 # ci_width = float within (0, 1) indicating the width of the confidence band (e.g., 0.95 for 95% CI)
 # quantile = which quantile to estimate
 def PanelQuantileLP(
-        data, 
-        Y,
-        Entity,
-        response, 
-        horizon, 
-        lags, 
-        varcov="robust", 
-        kernel="epa", 
-        bandwidth="hsheather", 
-        ci_width=0.95, 
-        quantile=0.5
-        ):
+    data,
+    Y,
+    Entity,
+    response,
+    horizon,
+    lags,
+    varcov="robust",
+    kernel="epa",
+    bandwidth="hsheather",
+    ci_width=0.95,
+    quantile=0.5,
+):
     ## Illegal inputs
     if (ci_width >= 1) | (ci_width <= 0):
         raise NotImplementedError("CI Width must be within (0, 1), non-inclusive!")
@@ -1358,15 +1369,11 @@ def PanelQuantileLP(
         "Mean",
         "LB",
         "UB",
-    ]  
+    ]
     # Empty output dataframe to be filled over every iteration
-    irf_full = pd.DataFrame(
-        columns=col_output
-    ) 
+    irf_full = pd.DataFrame(columns=col_output)
     # Determines what multiplier to use when calculating UB & LB from SE
-    z_val = NormalDist().inv_cdf(
-        (1 + ci_width) / 2
-    )  
+    z_val = NormalDist().inv_cdf((1 + ci_width) / 2)
 
     for r in response:
         ## Check ordering of response variable in the full list of Y
@@ -1374,8 +1381,10 @@ def PanelQuantileLP(
         ## Generate copy of data for horizon h + first difference RHS variables + transform response variable to desired horizon
         for h in range(horizon + 1):
             d = df.copy()
-            d[r + "forward"] = d.groupby(col_entity)[r].shift(
-                -h
+            d[r + "forward"] = d.groupby(col_entity)[r].shift(-h) - d.groupby(
+                col_entity
+            )[r].shift(
+                1
             )  # forward; equivalent to F`h'. in Stata
             ## Generate lags of RHS variables (only the first, either l0 or l1 will be used in the IRFs)
             list_RHS_forReg = []
@@ -1430,7 +1439,9 @@ def PanelQuantileLP(
             mod = smf.quantreg(formula=eqn, data=d)
             mod_ownshock = smf.quantreg(formula=eqn_ownshock, data=d)  # own-shock model
             est = mod.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)
-            est_ownshock = mod_ownshock.fit(q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth)  # own-shock model
+            est_ownshock = mod_ownshock.fit(
+                q=quantile, vcov=varcov, kernel=kernel, bandwidth=bandwidth
+            )  # own-shock model
             beta = est.params
             beta_ownshock = est_ownshock.params  # own-shock model
             se = est.bse
@@ -1461,7 +1472,7 @@ def PanelQuantileLP(
 
 ### IRFPlot
 ## Input attributes
-# irf = output from PanelLP
+# irf = IRF estimated
 # response = list of response variables to be plotted
 # shock = list of shock variables to be plotted
 # n_columns = number of columns in the consolidated IRF chart
@@ -1578,17 +1589,6 @@ def IRFPlot(
 
 
 ### ThresholdIRFPlot
-## Input attributes
-# irf = output from PanelLP
-# response = list of response variables to be plotted
-# shock = list of shock variables to be plotted
-# n_columns = number of columns in the consolidated IRF chart
-# n_rows = number of rows in the consolidated IRF chart (e.g., a 3 rows by 2 columns figure of 5-6 IRF plots)
-# maintitle = Title of the chart, default is 'Panel Local Projections Model: Impulse Response Functions'
-# show_fig = invokes plotly's Figure.show() function, default is True
-# save_pic = saves html and png versions of the chart, default is True
-# out_path = directory to save output, default is the existing working directory
-# out_name = name of output, default is 'IRFPlot'
 def ThresholdIRFPlot(
     irf_threshold_on,
     irf_threshold_off,
